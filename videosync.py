@@ -12,6 +12,7 @@ auto_fullscreen = True
 sync_mode: str = "local"  # Available modes: local only ):
 mpv_socket: str = "/tmp/mpv_socket"
 
+
 # End config #
 
 
@@ -33,23 +34,18 @@ def abort(message: str):
     sys.exit(1)
 
 
-# Calculate start time
+# Init sync mode (parse args)
 if sync_mode == "local":
-    time_chunk = 30  #
+    try:
+        seek = time.time() + int(sys.argv[1])*60
+        file: str = sys.argv[2]
+    except Exception:
+        abort("Usage: " + sys.argv[0] + " MINUTES FILENAME")
 
-    now = time.time()
-    seek = int(now + time_chunk / 2.0)
-    delay = seek % time_chunk
-    start_time = seek - delay + time_chunk
+    delay = seek % 60
+    start_time = seek - delay + 60
 else:
-    start_time = -1
     abort(sync_mode + " is not a valid sync mode")
-
-# Check arguments
-try:
-    file: str = sys.argv[1]
-except IndexError:
-    abort("Usage: " + os.path.basename(sys.argv[0]) + " FILENAME")
 
 # Check file exists
 if not os.path.isfile(file):
@@ -81,13 +77,16 @@ client.send(b'{ "command": ["set_property", "pause", true] }\n')
 now = time.time()
 countdown = start_time - now
 
-print("Check same countdown")
 try:
     while countdown > 1:
         if process.poll() is not None:
             abort("\rStopping countdown: mpv has terminated")
-        if countdown > 10:
-            print("\rStarting in " + str(int(countdown)), end="")
+        if countdown > 120:
+            print("\rStarting in " + str(int(countdown/60)) + " minutes", end="")
+        elif countdown > 60:
+            print("\rStarting in " + str(int(countdown/60)) + " minute", end="")
+        elif countdown > 10:
+            print("\rStarting in " + str(int(countdown)) + " seconds", end="")
         else:
             print("\nStarting in " + str(int(countdown)), end="")
         time.sleep(1)
@@ -108,5 +107,5 @@ client.close()
 try:
     process.communicate()
 except KeyboardInterrupt:
-    process.terminate()
+    process.kill()
 devnull.close()
